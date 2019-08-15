@@ -3,8 +3,8 @@ Backup/
 [Dd]ebug/
 Debug/
 ![Rr]elease/PHT3D_Viewer_3D.exe
-[Rr]elease/*
 Example3/
+*.tlog/
 x64/
 .vs/
 
@@ -24,6 +24,9 @@ ipch/
 *.vspx
 *.sap
 
+# Debug 
+*.pdb
+
 # Prerequisites
 *.d
 
@@ -35,6 +38,7 @@ ipch/
 *.lo
 *.o
 *.obj
+*.res
 
 # Precompiled Headers
 *.gch
