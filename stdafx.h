@@ -69,6 +69,8 @@ typedef boost::multi_array<double, 2> ArrayD2D;
 typedef boost::multi_array<double, 3> ArrayD3D;
 typedef boost::multi_array<double, 4> ArrayD4D;
 
+//#define OpenVR 1
+
 #include "CPPMatrix2.h"
 #include "ModelRead.h"
 #include "VTK_Operation.h"

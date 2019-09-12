@@ -32,6 +32,10 @@
 #include <vtkNamedColors.h>
 #include <vtkOpenGLRenderer.h>
 #include <vtkOrientationMarkerWidget.h>
+#include <vtkOpenVRCamera.h>
+#include <vtkOpenVRRenderer.h>
+#include "vtkOpenVRRenderWindow.h"
+#include <vtkOpenVRRenderWindowInteractor.h>
 #include <vtkPixel.h>
 #include <vtkPointData.h>
 #include <vtkPolyData.h>
@@ -100,26 +104,34 @@ public:
 
 private:
   // renderer, window, and interactor
-  vtkSmartPointer<vtkWin32OpenGLRenderWindow> renderWindow;
-  vtkSmartPointer<vtkOpenGLRenderer> renderer;
-  vtkSmartPointer<vtkWin32RenderWindowInteractor> interactor;
+  vtkNew<vtkActor> actor;
+#ifdef OpenVR
+  vtkNew<vtkOpenVRRenderer> renderer;
+  vtkNew<vtkOpenVRRenderWindow> renderWindow;
+  vtkNew<vtkOpenVRRenderWindowInteractor> interactor;
+  vtkNew<vtkOpenVRCamera> cam;
+#else
+  vtkNew<vtkWin32OpenGLRenderWindow> renderWindow;
+  vtkNew<vtkOpenGLRenderer> renderer;
+  vtkNew<vtkWin32RenderWindowInteractor> interactor;
+#endif
   // actor and mapper for text
-  vtkSmartPointer<vtkActor2D> textActor2D;
-  vtkSmartPointer<vtkTextMapper> textMapper;
+  vtkNew<vtkActor2D> textActor2D;
+  vtkNew<vtkTextMapper> textMapper;
 
   // actor and mapper for the model
-  vtkSmartPointer<vtkActor> actor;
+  //vtkSmartPointer<vtkActor> actor;
   //vtkSmartPointer<vtkDataSetMapper> mapper;
 
   // Axis
-  vtkSmartPointer<vtkAxesActor> axes;
+  vtkNew<vtkAxesActor> axes;
 
   // colormap
-  vtkSmartPointer<vtkScalarBarActor> scalarBar;
+  vtkNew<vtkScalarBarActor> scalarBar;
 
   // Model reader, widget for axes triad, colors, and property
   
-  vtkSmartPointer<vtkOrientationMarkerWidget> widget;
+  vtkNew<vtkOrientationMarkerWidget> widget;
   CSize size;
 };
 

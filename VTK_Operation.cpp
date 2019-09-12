@@ -18,19 +18,32 @@ void VTK_Operation::clear(void)
 {
   // vtkSmartPointers are deleted by assigning nullptr 
   // (or any other object) to the pointer
-  renderWindow = nullptr;
-  renderer = nullptr;
-  interactor = nullptr;
+#ifdef OpenVR
+  actor.~vtkNew();
+  renderWindow.~vtkNew();
+  renderer.~vtkNew();
+  interactor.~vtkNew();
+  cam.~vtkNew();
   // destroy text actor and mapper
-  textMapper = nullptr;
-  textActor2D = nullptr;
-  scalarBar = nullptr;
   // Additional variables
   //reader = nullptr;
   //mapper = nullptr;
   //colors = nullptr;
-  actor = nullptr;
+#else
+  renderWindow.~vtkNew();
+  renderer.~vtkNew();
+  interactor.~vtkNew();
+  // destroy text actor and mapper
+  textMapper.~vtkNew();
+  textActor2D.~vtkNew();
+  scalarBar.~vtkNew();
+  // Additional variables
+  //reader = nullptr;
+  //mapper = nullptr;
+  //colors = nullptr;
+  actor.~vtkNew();
   //backFace = nullptr;
+#endif
 }
 
 VTK_Operation::~VTK_Operation()
@@ -40,45 +53,75 @@ VTK_Operation::~VTK_Operation()
 
 int VTK_Operation::CreateVTKObjects(HWND hwnd, HWND hwndParent)
 {
-  
   // We create the basic parts of a pipeline and connect them
-  renderWindow = vtkSmartPointer<vtkWin32OpenGLRenderWindow>::New();
-  renderWindow->Register(NULL);
 
+#ifdef OpenVR
+/*  vtkNew<vtkActor> actor;
+  vtkNew<vtkOpenVRRenderer> renderer;
+  vtkNew<vtkOpenVRRenderWindow> renderWindow;
+  vtkNew<vtkOpenVRRenderWindowInteractor> interactor;
+  vtkNew<vtkOpenVRCamera> cam;*/
+/*  renderer = vtkSmartPointer<vtkOpenVRRenderer>::New();
+  renderWindow = vtkSmartPointer<vtkOpenVRRenderWindow>::New();
+  interactor = vtkSmartPointer<vtkOpenVRRenderWindowInteractor>::New();
+  cam = vtkSmartPointer<vtkOpenVRCamera>::New();*/
+#else
+  /*
+  actor = vtkSmartPointer<vtkActor>::New();
   renderer = vtkSmartPointer<vtkOpenGLRenderer>::New();
-  renderWindow->AddRenderer(renderer);
-
+  renderWindow = vtkSmartPointer<vtkWin32OpenGLRenderWindow>::New();
   interactor = vtkSmartPointer<vtkWin32RenderWindowInteractor>::New();
-  interactor->SetInstallMessageProc(0);
+  */
+  renderWindow->Register(NULL);
+#endif
 
+#ifdef OpenVR
+  renderWindow->AddRenderer(renderer.Get());
+  renderer->AddActor(actor.Get());
+  interactor->SetRenderWindow(renderWindow.Get());
+  renderer->SetActiveCamera(cam.Get());
+
+  vtkNew<vtkConeSource> cone;
+  vtkNew<vtkPolyDataMapper> mapper;
+  mapper->SetInputConnection(cone->GetOutputPort());
+  actor->SetMapper(mapper.Get());
+
+  //Reset camera to show the model at the centre
+  renderer->ResetCamera();
+
+#else
+  renderWindow->AddRenderer(renderer);
+  interactor->SetInstallMessageProc(0);
   // setup the parent window
   renderWindow->SetWindowId(hwnd);
   renderWindow->SetParentId(hwndParent);
+
   interactor->SetRenderWindow(renderWindow);
   interactor->Initialize();
-  vtkSmartPointer<vtkInteractorStyleTrackballCamera> style =
-    vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New();
+  vtkNew<vtkInteractorStyleTrackballCamera> style;
   interactor->SetInteractorStyle(style);
 
   // Setup Text Actor
-  textMapper = vtkSmartPointer<vtkTextMapper>::New();
+  //textMapper = vtkSmartPointer<vtkTextMapper>::New();
   textMapper->SetInput("MODFLOW Model");
-  textActor2D = vtkSmartPointer<vtkActor2D>::New();
+  //textActor2D = vtkSmartPointer<vtkActor2D>::New();
   textActor2D->SetDisplayPosition(450, 550);
   textMapper->GetTextProperty()->SetFontSize(30);
   textMapper->GetTextProperty()->SetColor(1.0, 1.0, 1.0);
   textActor2D->SetMapper(textMapper);
   // Add Axis
-  axes = vtkSmartPointer<vtkAxesActor>::New();
+  //axes = vtkSmartPointer<vtkAxesActor>::New();
   axes->SetNormalizedLabelPosition(1.2, 1.2, 1.2);
   axes->GetXAxisCaptionActor2D()->SetHeight(0.025);
   axes->GetYAxisCaptionActor2D()->SetHeight(0.025);
   axes->GetZAxisCaptionActor2D()->SetHeight(0.025);
-  widget = vtkSmartPointer<vtkOrientationMarkerWidget>::New();
+#ifndef OpenVR
+  //widget = vtkSmartPointer<vtkOrientationMarkerWidget>::New();
   widget->SetOutlineColor(0.9300, 0.5700, 0.1300);
   widget->SetOrientationMarker(axes);
   widget->SetInteractor(interactor);
   widget->SetEnabled(1);
+#endif
   // Prevent the interaction to fix the location of the coordinate axes triad
   // at the left bottom
   //widget->InteractiveOff(); // Trigger WM_SIZE
@@ -87,11 +130,13 @@ int VTK_Operation::CreateVTKObjects(HWND hwnd, HWND hwndParent)
   //Add the Actors
   renderer->AddActor(textActor2D);
 
-  //Reset camera to show the model at the centre
-  renderer->ResetCamera();
-  
   //renderer->SetBackground(colors->GetColor3d("Wheat").GetData());
   renderer->SetBackground(.1, .2, .4);
+
+  //Reset camera to show the model at the centre
+  renderer->ResetCamera();
+#endif
+
   //renderer->SetBackground(0.0, 0.0, 0.25);
   return(1);
 }
@@ -110,7 +155,9 @@ int VTK_Operation::StepObjects(int count)
 
 void VTK_Operation::WidgetInteractiveOff(void)
 {
+#ifndef OpenVR
   widget->InteractiveOff(); // Trigger WM_SIZE
+#endif
 }
 
 void VTK_Operation::Render()
@@ -127,62 +174,84 @@ void VTK_Operation::OnSize(CSize size)
     //int *val1;
     //val1 = renderWindow->GetSize();
     renderWindow->SetSize(size.cx, size.cy);
-    int width = textMapper->GetWidth(renderer);
-    this->size = size;
-    textActor2D->SetDisplayPosition((size.cx- width)/2, size.cy-50);
-    //interactor->UpdateSize(size.cx, size.cy);
-    //interactor->SetSize(size.cx, size.cy);
+    if (textMapper && renderer->GetVTKWindow()) {
+      int width = textMapper->GetWidth(renderer);
+      this->size = size;
+      textActor2D->SetDisplayPosition((size.cx - width) / 2, size.cy - 50);
+      //interactor->UpdateSize(size.cx, size.cy);
+      //interactor->SetSize(size.cx, size.cy);
+    }
   }
 }
 
 void VTK_Operation::OnTimer(HWND hWnd, UINT uMsg)
 {
+#ifndef OpenVR
   interactor->OnTimer(hWnd, uMsg);
+#endif
 }
 
 void VTK_Operation::OnLButtonDblClk(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnLButtonDown(hWnd, uMsg, point.x, point.y, 1);
+#endif
 }
 
 void VTK_Operation::OnLButtonDown(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnLButtonDown(hWnd, uMsg, point.x, point.y, 0);
+#endif
 }
 
 void VTK_Operation::OnMButtonDown(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnMButtonDown(hWnd, uMsg, point.x, point.y, 0);
+#endif
 }
 
 void VTK_Operation::OnRButtonDown(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnRButtonDown(hWnd, uMsg, point.x, point.y, 0);
+#endif
 }
 
 void VTK_Operation::OnLButtonUp(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnLButtonUp(hWnd, uMsg, point.x, point.y);
+#endif
 }
 
 void VTK_Operation::OnMButtonUp(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnMButtonUp(hWnd, uMsg, point.x, point.y);
+#endif
 }
 
 void VTK_Operation::OnRButtonUp(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnRButtonUp(hWnd, uMsg, point.x, point.y);
+#endif
 }
 
 void VTK_Operation::OnMouseMove(HWND hWnd, UINT uMsg, CPoint point)
 {
+#ifndef OpenVR
   interactor->OnMouseMove(hWnd, uMsg, point.x, point.y);
+#endif
 }
 
 void VTK_Operation::OnChar(HWND hWnd, UINT nChar, UINT nRepCnt, UINT nFlags)
 {
+#ifndef OpenVR
   interactor->OnChar(hWnd, nChar, nRepCnt, nFlags);
+#endif
 }
 
 void VTK_Operation::FileNew()
@@ -204,13 +273,13 @@ void VTK_Operation::FileOpen(PHT3D_Model& mPHT3DM, CString fileName)
   output->GetCellData()->SetScalars(output->GetCellData()->GetArray(0));
   */
   //vtkUnstructuredGrid construction
-  vtkSmartPointer<vtkUnstructuredGrid> unstGrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
-  vtkSmartPointer<vtkFloatArray> fArr = vtkSmartPointer<vtkFloatArray>::New();
-  vtkSmartPointer<vtkDoubleArray> dArr = vtkSmartPointer<vtkDoubleArray>::New();
-  vtkSmartPointer<vtkIntArray> iArr = vtkSmartPointer<vtkIntArray>::New();
-  vtkSmartPointer<vtkCellArray> cellArr = vtkSmartPointer<vtkCellArray>::New();
-  vtkSmartPointer<vtkIdTypeArray> cellIdType = vtkSmartPointer<vtkIdTypeArray>::New();
-  vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+  vtkNew<vtkUnstructuredGrid> unstGrid;
+  vtkNew<vtkFloatArray> fArr;
+  vtkNew<vtkDoubleArray> dArr;
+  vtkNew<vtkIntArray> iArr;
+  vtkNew<vtkCellArray> cellArr;
+  vtkNew<vtkIdTypeArray> cellIdType;
+  vtkNew<vtkPoints> points;
   MODFLOWClass& mf = mPHT3DM.MODFLOW;
   double minVal=0, maxVal = 0;
   if (1) {
@@ -383,14 +452,14 @@ void VTK_Operation::FileOpen(PHT3D_Model& mPHT3DM, CString fileName)
     unstGrid->GetCellData()->SetScalars(dArr);
   }
   // Setup Model Actor
-  vtkSmartPointer<vtkDataSetMapper> mapper = vtkSmartPointer<vtkDataSetMapper>::New();
+  vtkNew<vtkDataSetMapper> mapper;
   //mapper->SetInputConnection(reader->GetOutputPort());
   mapper->SetInputData(unstGrid);
   //mapper->ScalarVisibilityOff();
   mapper->ScalarVisibilityOn();
 
   // Scale bar actor for the Colormap
-  scalarBar = vtkSmartPointer<vtkScalarBarActor>::New();
+  //scalarBar = vtkSmartPointer<vtkScalarBarActor>::New();
   scalarBar->SetLookupTable(mapper->GetLookupTable());
   scalarBar->SetUnconstrainedFontSize(true);
   scalarBar->SetTitle("Head (ft)");
@@ -405,7 +474,7 @@ void VTK_Operation::FileOpen(PHT3D_Model& mPHT3DM, CString fileName)
   scalarBar->SetWidth(0.11);
   scalarBar->SetNumberOfLabels(4);
   // Jet color scheme
-  vtkSmartPointer<vtkLookupTable> jet = vtkSmartPointer<vtkLookupTable>::New();
+  vtkNew<vtkLookupTable> jet;
   jet->SetNumberOfColors(257);
   jet->Build();
   for (int i = 0; i <= 64; i++) {
@@ -432,24 +501,28 @@ void VTK_Operation::FileOpen(PHT3D_Model& mPHT3DM, CString fileName)
   mapper->SetScalarModeToUseCellData();
   //mapper->SetScalarModeToUsePointData();
 
-  actor = vtkSmartPointer<vtkActor>::New();
   actor->SetMapper(mapper);
   // True for grid lines
   if (true) {
-    actor->GetProperty()->SetLineWidth(0.0);
+    actor->GetProperty()->SetLineWidth(0.001); // This should not be zero => OpenGL error (invalid value)
     actor->GetProperty()->EdgeVisibilityOn();
   }
   else
     actor->GetProperty()->EdgeVisibilityOff();
 
   // Backface setup
-  vtkSmartPointer<vtkNamedColors> colors = vtkSmartPointer<vtkNamedColors>::New();
-  vtkSmartPointer<vtkProperty> backFace = vtkSmartPointer<vtkProperty>::New();
+  vtkNew<vtkNamedColors> colors;
+  vtkNew<vtkProperty> backFace;
   backFace->SetColor(colors->GetColor3d("tomato").GetData());
   actor->SetBackfaceProperty(backFace);
 
   renderer->AddActor(actor);
   renderer->AddActor(scalarBar);
+
   //Reset camera to show the model at the centre
   renderer->ResetCamera();
+#ifdef OpenVR
+  renderWindow->Render();
+  interactor->Start();
+#endif
 }
