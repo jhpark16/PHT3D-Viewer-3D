@@ -313,39 +313,41 @@ void VTK_Operation::FileOpen(PHT3D_Model& mPHT3DM, CString fileName)
   //int *connectivity = new int[(nLay-1)*(nRow-1)*(nCol-1)] {};
   // The heights are not aligned at each nodal points. So, it is necessary to estimate the height
   // at each node using interpolation of heights
-  CPPMatrix2<double>& elevation = mf.DIS_TOP;
+  CPPMatrix2<double> *elevation = &(mf.DIS_TOP);
   for (int k = 0; k < nLay; k++) {
     // Takes care of four corners
-    if (k < nLay - 1) {
-      elevation = mf.DIS_BOTMS[k];
+    if (k == 0) {
+      // The elevation of the top layer is from the DIS_TOP
+      elevation = &(mf.DIS_TOP);
     }
     else {
-      elevation = mf.DIS_TOP;
+      // The bottom elevation is used for most layers
+      elevation = &(mf.DIS_BOTMS[k - 1]);
     }
-    zLoc[0 * nCol + 0] = elevation[0][0];
-    zLoc[0 * nCol + (nCol-1)] = elevation[0][nCol-2];
-    zLoc[(nRow - 1) * nCol + 0] = elevation[nRow-2][0];
-    zLoc[(nRow - 1) * nCol + (nCol-1)] = elevation[nRow-2][nCol-2];
+    zLoc[0 * nCol + 0] = (*elevation)[0][0];
+    zLoc[0 * nCol + (nCol-1)] = (*elevation)[0][nCol-2];
+    zLoc[(nRow - 1) * nCol + 0] = (*elevation)[nRow-2][0];
+    zLoc[(nRow - 1) * nCol + (nCol-1)] = (*elevation)[nRow-2][nCol-2];
     // Interpolate edges along X direction 
     for (int i = 1; i < nCol-1; i++) {
-      zLoc[0*nCol + i] = (elevation[0][i-1] + 
-        elevation[0][i])/2.0;
-      zLoc[(nRow-1)*nCol + i] = (elevation[nRow-2][i-1] + 
-        elevation[nRow - 2][i])/2.0;
+      zLoc[0*nCol + i] = ((*elevation)[0][i-1] +
+        (*elevation)[0][i])/2.0;
+      zLoc[(nRow-1)*nCol + i] = ((*elevation)[nRow-2][i-1] +
+        (*elevation)[nRow - 2][i])/2.0;
     }
     // Interpolate edges along Y direction 
     for (int j = 1; j < nRow - 1; j++) {
-      zLoc[(j * nCol) + 0] = (elevation[j-1][0] +
-        elevation[j][0]) / 2.0;
-      zLoc[(j * nCol) + nCol-1] = (elevation[j-1][nCol-2] +
-        elevation[j][nCol-2]) / 2.0;
+      zLoc[(j * nCol) + 0] = ((*elevation)[j-1][0] +
+        (*elevation)[j][0]) / 2.0;
+      zLoc[(j * nCol) + nCol-1] = ((*elevation)[j-1][nCol-2] +
+        (*elevation)[j][nCol-2]) / 2.0;
     }
     // Interpolate the remaining part of the 3D model
     for (int j = 1; j < nRow-1; j++) {
       for (int i = 1; i < nCol-1; i++) {
-        zLoc[(j * nCol) + i] = (elevation[j - 1][i - 1] +
-          elevation[j][i - 1] + elevation[j - 1][i] + 
-          elevation[j][i]) / 4.0;
+        zLoc[(j * nCol) + i] = ((*elevation)[j - 1][i - 1] +
+          (*elevation)[j][i - 1] + (*elevation)[j - 1][i] +
+          (*elevation)[j][i]) / 4.0;
       }
     }
     // Set the X, Y, Z of all nodal points
